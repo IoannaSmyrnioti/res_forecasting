@@ -3,7 +3,7 @@ from res_forecasting.weather_service.storage_client import WeatherDataStorage
 
 
 def test_weather_client():
-    
+
     api_client = WeatherAPIClient()
     # data = api_client.get_weather_data(38.9697, -77.385, "2020-10-01", end_date = "2020-10-02", timeout = 10)
     # assert data is not None
