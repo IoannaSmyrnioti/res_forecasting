@@ -13,3 +13,4 @@ dist/
 *.wal
 *.tmp/
 *.json
+*processed*.csv

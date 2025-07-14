@@ -1,5 +1,5 @@
-from res_forecasting.weather_service.weather_client import WeatherAPIClient
-from res_forecasting.weather_service.storage_client import WeatherDataStorage
+from res_forecasting.helpers.weather_service.weather_client import WeatherAPIClient
+from res_forecasting.helpers.weather_service.storage_client import WeatherDataStorage
 import requests
 import os
 from dotenv import load_dotenv
