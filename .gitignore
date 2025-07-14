@@ -3,9 +3,14 @@ dist/
 .tox/
 .pytest_cache/
 .dump/
-**/*.pyc
+*.pyc
 **/__pycache__
 .mypy_cache
 .poetry/
 .idea
 .coverage
+*.duckdb*
+*.wal
+*.tmp/
+*.json
+*processed*.csv
