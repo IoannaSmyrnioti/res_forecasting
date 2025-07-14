@@ -5,7 +5,7 @@ import datetime
 
 
 def test_wf_data_handler():
-    
+
     normalize_names = True
     header = 9
     data_folder = os.path.join("tests", "test_data", "wf", "turbine_data")
@@ -35,8 +35,10 @@ def test_wf_data_handler():
     with WFDataHandler("wf_data.duckdb") as wf_db_handler:
         wf_db_handler.connection = duckdb.connect(database=":memory:")
         assert wf_db_handler.connection is not None
-        
-        wf_db_handler.ingest_directory(data_folder, columns = columns, normalize_names = normalize_names, header = header)
+
+        wf_db_handler.ingest_directory(
+            data_folder, columns=columns, normalize_names=normalize_names, header=header
+        )
 
         df = wf_db_handler.get_df(
             site_name="Penmanshiel",
