@@ -4,6 +4,6 @@
     ],
     "python.testing.unittestEnabled": false,
     "python.testing.pytestEnabled": true,
-    "python.terminal.activateEnvironment": false,
+    "python.terminal.activateEnvironment": true,
     "editor.quickSuggestionsDelay": 1000,
 }
