@@ -14,3 +14,4 @@ dist/
 *.tmp/
 *.json
 *processed*.csv
+res_forecasting/data/wf/

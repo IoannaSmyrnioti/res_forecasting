@@ -18,21 +18,16 @@ from dotenv import load_dotenv
 # Load environment variables from .env file
 load_dotenv()
 
-
 class WeatherAPIClient:
     """A Class to fetch weather data from Visual Crossing API."""
-
+    
     def __init__(self):
         self.api_key = os.getenv("WEATHER_API_KEY")
         if not self.api_key:
-            raise ValueError(
-                "Missing API key. Set WEATHER_API_KEY in .env or environment."
-            )
+            raise ValueError("Missing API key. Set WEATHER_API_KEY in .env or environment.")
         self.base_url = "https://weather.visualcrossing.com/VisualCrossingWebServices/rest/services/timeline"
 
-    def get_weather_data(
-        self, latitude, longitude, start_date, end_date=None, timeout=None, **params
-    ):
+    def get_weather_data(self, latitude, longitude, start_date, end_date = None, timeout = None, **params):
         """
         Fetches weather data from Visual Crossing API.
 
@@ -47,10 +42,10 @@ class WeatherAPIClient:
             url = f"{self.base_url}/{latitude},{longitude}/{start_date}"
         else:
             url = f"{self.base_url}/{latitude},{longitude}/{start_date}/{end_date}"
-        params["key"] = self.api_key
+        params['key'] = self.api_key
 
         response = requests.get(url, params=params, timeout=timeout)
-
+        
         try:
             response.raise_for_status()
             return response.json()
@@ -62,13 +57,12 @@ class WeatherAPIClient:
             print(f"Error occurred: {e}")
             raise
 
-
 if __name__ == "__main__":
     api_client = WeatherAPIClient()
-    # data = api_client.get_weather_data(38.9697, -77.385, "2020-10-01", end_date = "2020-10-02", timeout = 10)
+    # data = api_client.get_weather_data(52.4006, -0.947133, "2020-10-01", end_date = "2020-10-02", timeout = 10)
 
     storage = WeatherDataStorage()
     # storage.store_weather_data(data)
 
-    results = storage.find_by("2020-10-02", 38.9697, -77.385)
+    results = storage.find_by("2020-10-02", 52.4006, -0.947133)
     print()
