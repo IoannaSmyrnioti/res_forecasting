@@ -1,3 +1,4 @@
+import os
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
@@ -13,6 +14,8 @@ def explore_scada(df, timestamp_col="date_and_time", time_index=True, plot_sampl
         time_index (bool): Whether to set the timestamp column as index.
         plot_sample (int): Max points to plot in scatter/time series.
     """
+    df = df.copy()  # <-- για να μην αλλάζεις το αρχικό df
+    os.makedirs(output_dir, exist_ok=True)  # <-- για τα savefig
 
     print("Dataset Overview")
     print("Shape:", df.shape)
@@ -83,11 +86,7 @@ def explore_scada(df, timestamp_col="date_and_time", time_index=True, plot_sampl
         print("No strongly redundant pairs detected.")
     else:
         print(redundant_pairs)
-
-        # Optional: save to CSV
-        #redundant_pairs.to_csv("highly_correlated_features.csv")
-        #print("Saved to: highly_correlated_features.csv")
-    
+            
     return {
         "correlation_matrix": corr,
         "redundant_pairs": redundant_pairs
@@ -115,21 +114,4 @@ def explore_and_save(df, output_dir="eda_outputs", correlation_threshold=0.95):
 
     return results
 
-# Example with SCADA data
 
-#from res_forecasting.helpers.wf_data_handler import WFDataHandler
-#from res_forecasting.data.preprocessing.eda_tools import explore_and_save
-#import datetime
-
-#with WFDataHandler("wf_data.duckdb") as wf_db_handler: #if you need to extract data
-#    df = wf_db_handler.get_df(
-#        site_name="Kelmarsh",
-#        turbine_id=1,
-#        datetime_start=datetime.datetime(2020, 1, 1),
-#        datetime_end=datetime.datetime(2021, 1, 1)
-#    )
-
-# Load SCADA data
-#with WFDataHandler("wf_data.duckdb") as wf_db_handler:
-#    scada_df = wf_db_handler.get_df()
-#results = explore_and_save(scada_df, output_dir="eda_outputs", correlation_threshold=0.75)

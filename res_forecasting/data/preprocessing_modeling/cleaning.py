@@ -58,8 +58,8 @@ def clean_scada_data(
     features_to_keep: list[str] | None = None,
     dropna: bool = True,
     basic_filter: bool = True,
-    drop_negative_power: bool = True,
     min_wind_speed: float | None = None,
+    max_wind_speed: float | None = None,  
     make_wind_vectors: bool = True,
     drop_wind_dir: bool = False,
     verbose: bool = True,
@@ -78,13 +78,19 @@ def clean_scada_data(
         rename_map = prepare_col_map(dfc.columns.tolist(), col_map)
         dfc = dfc.rename(columns=rename_map)
     
-    # Sanitize setpoint and pitch
+    # 0.5) Keep only requested features
+    if features_to_keep:
+        missing = [c for c in features_to_keep if c not in dfc.columns]
+        if missing:
+            raise KeyError(f"Missing required columns: {missing}")
+        dfc = dfc[features_to_keep]
 
-    # 1) Coerce to numeric
-    #for c in ("power_setpoint", "pitch_a", "pitch_b", "pitch_c"):
-    #    if c in dfc.columns:
-    #        dfc[c] = pd.to_numeric(dfc[c], errors="coerce")
-
+    # 1) Drop rows where data_availability is 0
+    if "data_availability" in dfc.columns:
+        before = len(dfc)
+        dfc = dfc[dfc["data_availability"] != 0]
+        log_step("drop_zero_data_availability", before, len(dfc), steps, n0)
+    
     # 2) Clip obvious ranges
     if "power_setpoint" in dfc.columns:
         dfc["power_setpoint"] = dfc["power_setpoint"].clip(lower=0)
@@ -95,19 +101,10 @@ def clean_scada_data(
 
     # 3) Derive once; use later
     if {"pitch_a","pitch_b","pitch_c"}.issubset(dfc.columns):
-        dfc["pitch_mean"]   = dfc[["pitch_a","pitch_b","pitch_c"]].mean(axis=1, skipna=True)
         dfc["pitch_max"]    = dfc[["pitch_a","pitch_b","pitch_c"]].max(axis=1,  skipna=True)
-        dfc["pitch_spread"] = (
-            dfc[["pitch_a","pitch_b","pitch_c"]].max(axis=1)
-            - dfc[["pitch_a","pitch_b","pitch_c"]].min(axis=1)
-        )
-    # 1) Keep only requested features
-    #if features_to_keep:
-    #    missing = [c for c in features_to_keep if c not in dfc.columns]
-    #    if missing:
-    #        raise KeyError(f"Missing required columns: {missing}")
-    #    dfc = dfc[features_to_keep]
-
+        # Drop the original pitch columns, keep only pitch_max
+        dfc = dfc.drop(columns=["pitch_a", "pitch_b", "pitch_c"])
+        
     # 4) Drop NaNs early
     if dropna:
         before = len(dfc)
@@ -124,56 +121,36 @@ def clean_scada_data(
     if basic_filter:
         before = len(dfc)
         cond = pd.Series(True, index=dfc.index)
-        if wind_speed_key in dfc.columns:
-            cond &= dfc[wind_speed_key].between(0, 60)  # m/s
+        if wind_speed_key in dfc.columns and not (min_wind_speed is not None and max_wind_speed is not None):
+            cond &= dfc[wind_speed_key].between(0, 30)  # keep valid wind speed values (m/s)
         if power_key in dfc.columns:
-            cond &= dfc[power_key] >= 0
+            cond &= dfc[power_key] >= 0 # keep non-negative power values
         dfc = dfc[cond]
         log_step("basic_range_filters", before, len(dfc), steps, n0)
 
-    # 7) Drop negative power if requested
-    if drop_negative_power and power_key in dfc.columns:
+    # 7) Minimum and maximum wind speed filter
+    if (min_wind_speed is not None or max_wind_speed is not None) and wind_speed_key in dfc.columns:
         before = len(dfc)
-        dfc = dfc[dfc[power_key] >= 0]
-        log_step("drop_negative_power", before, len(dfc), steps, n0)
+        cond = pd.Series(True, index=dfc.index)
+        if min_wind_speed is not None:
+            cond &= dfc[wind_speed_key] >= min_wind_speed
+        if max_wind_speed is not None:
+            cond &= dfc[wind_speed_key] <= max_wind_speed
+        dfc = dfc[cond]
+        log_step("wind_speed_cut_in_out_filter", before, len(dfc), steps, n0)
 
-    # 8) Minimum wind speed filter
-    if min_wind_speed is not None and wind_speed_key in dfc.columns:
-        before = len(dfc)
-        dfc = dfc[dfc[wind_speed_key] >= min_wind_speed]
-        log_step("min_wind_speed_filter", before, len(dfc), steps, n0)
-
-    # 9) Final NaN sweep
+    # 8) Final NaN sweep
     before = len(dfc)
     dfc = dfc.dropna()
     log_step("dropna_final", before, len(dfc), steps, n0)
 
-    # 10) Vectorize wind direction
+    # 9) Vectorize wind direction
     if make_wind_vectors and wind_dir_key in dfc.columns:
         wd_rad = np.deg2rad(dfc[wind_dir_key])
         dfc["wind_x"] = dfc[wind_speed_key] * np.cos(wd_rad)
         dfc["wind_y"] = dfc[wind_speed_key] * np.sin(wd_rad)
         if drop_wind_dir:
             dfc = dfc.drop(columns=[wind_dir_key])
-
-    # 11) Keep only requested features (NOW at the end; include derived/extras if present) 
-    if features_to_keep: 
-        required = list(features_to_keep) # your must-have columns (strict) 
-        
-        # auto-include if present (no need to list them in features_to_keep) 
-        optional = [ "pitch_mean", "pitch_max", "pitch_spread", ] 
-        missing = [c for c in required if c not in dfc.columns] 
-        
-        if missing: 
-            raise KeyError(f"Missing required columns: {missing}") 
-        keep = required + [c for c in optional if c in dfc.columns] 
-        # preserve order, drop dups 
-        seen, ordered_keep = set(), [] 
-        for c in keep: 
-            if c in dfc.columns and c not in seen: 
-                ordered_keep.append(c); seen.add(c) 
-                
-        dfc = dfc[ordered_keep]
 
     # Report
     report = {
@@ -190,8 +167,8 @@ def clean_scada_data(
             "power_key": power_key,
             "dropna": dropna,
             "basic_filter": basic_filter,
-            "drop_negative_power": drop_negative_power,
             "min_wind_speed": min_wind_speed,
+            "max_wind_speed": max_wind_speed,
             "make_wind_vectors": make_wind_vectors,
             "drop_wind_dir": drop_wind_dir,
             "col_map": col_map,
@@ -205,32 +182,3 @@ def clean_scada_data(
 
     return dfc, report
 
-# Example usage:
-#from res_forecasting.data.preprocessing.cleaning1 import clean_scada_data
-
-#col_map = {
-#    "date_and_time":   "timestamp",
-#    "wind_speed_ms":  "wind_speed",
-#    "wind_direction":    "wind_dir",
-#    "power_kw":       "power",
-#"turbine_power_setpoint_kw": "power_setpoint",
-#"blade_angle_pitch_position_a":  "pitch_a",
-#"blade_angle_pitch_position_b":  "pitch_b",
-#"blade_angle_pitch_position_c":  "pitch_c",
-#}
-
-#keep = ["timestamp", "wind_speed", "wind_dir", "power", "power_setpoint","pitch_a","pitch_b","pitch_c"]
-
-#cleaned_df, report = clean_scada_data(
-#    scada_df,
-#    col_map=col_map,                # maps SCADA names to standard keys
-#    features_to_keep=keep,          # operate only on the essentials
-#    dropna=True,
-#    basic_filter=True,
-#    drop_negative_power=True,
-#    min_wind_speed=None,            # i could set it if i want to trim noise
-#    make_wind_vectors=True,         # adds wind_x, wind_y
-#    drop_wind_dir=False,            # keep raw direction for plots
-#    verbose=True,
-#    pitch_bounds=(0.0, 95.0)        # clip pitch angles to sensible range
-#)
